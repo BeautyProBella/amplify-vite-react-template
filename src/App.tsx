@@ -1,14 +1,32 @@
 import { useEffect, useState } from "react";
-import type { Schema } from "../amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
-import { Authenticator } from '@aws-amplify/ui-react'
-import '@aws-amplify/ui-react/styles.css'
+import { Authenticator } from '@aws-amplify/ui-react';
+import '@aws-amplify/ui-react/styles.css';
 import AWS from 'aws-sdk';
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../amplify/data/resource";
 
 const client = generateClient<Schema>();
 
+// Replace this with your actual Identity Pool ID
+const IDENTITY_POOL_ID = 'us-east-1:e45860f2-bc46-478b-bcdc-02c63d219405';
+
 function App() {
   const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+
+  useEffect(() => {
+    // Set up AWS credentials using the Amplify Auth
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: IDENTITY_POOL_ID,
+    });
+
+    (AWS.config.credentials as AWS.CognitoIdentityCredentials).refresh((err?: AWS.AWSError) => {
+      if (err) {
+        console.error("Error fetching AWS credentials", err);
+      } else {
+        console.log("AWS credentials successfully fetched");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     client.models.Todo.observeQuery().subscribe({
@@ -16,42 +34,12 @@ function App() {
     });
   }, []);
 
-  useEffect(() => {
-    // Function to extract query parameters
-    const getQueryParams = (param: string) => {
-      const query = new URLSearchParams(window.location.search);
-      return query.get(param);
-    };
-
-    // Extract the Amazon Access Token from query string
-    const amazonAccessToken = getQueryParams('access_token');
-
-    if (amazonAccessToken) {
-      // Configure AWS credentials
-      AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-        IdentityPoolId: 'us-east-1:e45860f2-bc46-478b-bcdc-02c63d219405',
-        Logins: {
-          'www.amazon.com': amazonAccessToken
-        }
-      });
-
-      // Optionally, refresh credentials here or handle authentication
-      AWS.config.credentials.refresh((error) => {
-        if (error) {
-          console.error('Error refreshing credentials:', error);
-        } else {
-          console.log('Credentials successfully refreshed');
-        }
-      });
-    }
-  }, []);
-
   function createTodo() {
     client.models.Todo.create({ content: window.prompt("Todo content") });
   }
-
+    
   function deleteTodo(id: string) {
-    client.models.Todo.delete({ id })
+    client.models.Todo.delete({ id });
   }
 
   return (
@@ -82,3 +70,4 @@ function App() {
 }
 
 export default App;
+
